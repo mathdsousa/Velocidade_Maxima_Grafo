@@ -10,6 +10,7 @@
 #include <limits.h>
 
 #define DEBUG 0
+#define IMPRIME 1
 
 typedef struct noh Noh ; // Estrutura para representar uma aresta
 struct noh 
@@ -56,19 +57,25 @@ void insereArcoGrafo(Grafo G, int v, int w, int c)
         printf("Aresta: %d-%d, peso: %d\n", v, w, c);
 }
 
-void subtraiMaiorPeso(Grafo G, int n) // Subtrai dos pesos de todas as arestas o valor máximo de peso 
-{                                     // encontrado
-    for(int i = 0 ; i < G->n ; i++)
-        for(Noh *p = G->A[i]; p != NULL ; p = p->prox)
-            p->peso -= n;
+int verificaLista(int *R, int fim, int v)
+{
+    for(int i = 0; i < fim; i++)
+    {
+        if(R[i] == v)
+            return 0;
+    }
+    return 1;
 }
 
-void MaxDijkstra(Grafo G, int origem, int *dist, int *pred) // Dijkstra adaptado para o maior caminho
-{
-    int i, *R;
-    int v, w, peso, tam_R, max_dist;
+void percorrePista(Grafo G, int origem, int *dist, int *pred) 
+{                                                           
+    int i, counter = 0;
+    int v, w, peso;
     Noh *p;
-    
+    int flag = 1; // Indica até quando será preciso percorre todos os vértices
+    int *R = (int*) malloc(sizeof(int) * G->n); // Lista para controlar os vértices procurados
+    int inicio, fim;
+
     // inicializando distâncias e predecessores
     for(i = 0 ; i < G->n ; i++) 
     {
@@ -76,71 +83,65 @@ void MaxDijkstra(Grafo G, int origem, int *dist, int *pred) // Dijkstra adaptado
         pred[i] = - 1;
     }
     dist[origem] = 0;
-    
-    // inicializando conjunto de vértices "resolvidos" R
-    R = malloc(G->n * sizeof(int));
-    for (i = 0; i < G->n; i++)
-        R[i] = 0;
-    tam_R = 0;
 
-    // enquanto não encontrar o caminho máximo para todo vértice
-    while (tam_R < G->n) {
-        // buscando vértice v em V \ R que maximiza dist[v]
-        max_dist = INT_MIN;
-        v = -1;
-        for(i = 0 ; i <= G->n; i++)
-            if(R[i] == 0 && dist[i] > max_dist) 
-            {
-                v = i;
-                max_dist = dist[i];
-            }
-        if(DEBUG)
-            printf("v: %d\n", v);
-        // adicionando v a R e atualizando o conjunto R
-        R[v] = 1; tam_R++;
-        if(DEBUG && v == 0)
-            printf("aresta: %d-%d, peso: %d\n", 0, G->A[v]->rotulo, G->A[v]->peso);
-        // percorrendo lista com vizinhos de v
-        for(p = G->A[v]; p != NULL; p = p->prox) {
-            w = p->rotulo;
-            peso = p->peso;
+
+    // Percorremos todas as arestas do grafo (nro. de vértices - 1) vezes
+    while (flag == 1) 
+    {
+        inicio = 0; fim = 0; // Inicializa a lista
+        R[fim++] = origem;
+        flag = 0;
+        while(fim > inicio) // Verificamos cada vértice
+        {
+            v = R[inicio++];
             if(DEBUG)
-                printf("rotulo: %d; peso: %d\n", w, peso);
-
-        // e atualizando as distâncias e predecessores quando for o caso
-            if(R[w] == 0 && dist[w] < dist[v] + peso) 
+                printf("v = %d\n", v); 
+            // percorrendo lista com vizinhos de v
+            for(p = G->A[v]; p != NULL; p = p->prox) 
             {
-                dist[w] = dist[v] + peso;
-                pred[w] = v;
+                w = p->rotulo;
+                peso = p->peso;
+                if(DEBUG)
+                    printf("rotulo: %d; peso: %d, dist: %d \n", w, peso, dist[v]);
+
+            // e atualizando as distâncias e predecessores quando for o caso
+                if(dist[v] != INT_MIN && dist[w] < dist[v] + peso) 
+                {
+                    dist[w] = dist[v] + peso; 
+                    pred[w] = v;              
+                    if(DEBUG)
+                    {
+                        printf("Nova distancia de %d: %d; Novo predecessor: %d\n", w, dist[w], pred[w]);
+                    }
+                    flag = 1; // Indica que ocorreu mudança
+                }
+                if(verificaLista(R, fim, w)) // Se um vértice já está na lista
+                {
+                    R[fim++] = w; // Caso não estaja, ele é adicionado na lista
+                }
+                counter++;
+                if(DEBUG)
+                {
+                    printf("Counter = %d\n", counter);
+                    printf("Inicio = %d, fim = %d \n", inicio, fim);
+                }
             }
         }
     }
-    free(R);
+    if(IMPRIME)
+        printf("Counter: %d\n", counter);
 } 
-
-int qntdArestasPercorridas(int *pred, int n) // Calcula quantidade de arestas percorridas do vértice
-{                                            // 0 até n-1 pelo caminho de velocidade máxima
-    int qntd_arestas = 0, vertice = n - 1;
-
-    while(pred[vertice] != -1)
-    {
-        vertice = pred[vertice];
-        qntd_arestas++;
-    }
-
-    return qntd_arestas;
-}
 
 void imprime(int *dist, int *pred, int n)
 {
-    printf("dist: ");
+    printf("dist:\n");
     for(int i = 0; i < n; i++)
-        printf("%d ", dist[i]);
+        printf("%d: %d\n", i, dist[i]);
 
-    printf("\npred:");
+    printf("\npred:\n");
 
     for(int i = 0; i < n; i++)
-        printf("%d ", pred[i]);
+        printf("%d: %d\n", i, pred[i]);
     printf("\n");
 }
 
@@ -148,8 +149,6 @@ int main()
 {
     int n, m, vel_ini;
     int u, v, c;
-    int maiorPeso = INT_MIN;
-    int result;
 
     scanf("%d %d %d", &n, &m, &vel_ini);
 
@@ -165,48 +164,23 @@ int main()
     {
         scanf("%d %d %d", &u, &v, &c);    
         insereArcoGrafo(G, u, v, c);
-        if(maiorPeso < c) // Guarda o valor do maior peso encontrado
-            maiorPeso = c;
     }
-
-    if(DEBUG)
-        printf("aresta: %d-%d, peso: %d\n", 0, G->A[0]->rotulo, G->A[0]->peso);
-
-    if(DEBUG)
-        printf("maiorPeso: %d\n", maiorPeso);
 
     if(DEBUG)
         printf("Inseriu todas as arestas\n");
 
-    subtraiMaiorPeso(G, maiorPeso);
-
-    if(DEBUG)
-        printf("Subtraiu os pesos\n");
-
     int *dist = (int*) malloc(sizeof(int) * n);
     int *pred = (int*) malloc(sizeof(int) * n);
 
-    Dijkstra(G, 0, dist, pred);
+    percorrePista(G, 0, dist, pred);
 
     if(DEBUG)
-        printf("Passou pelo Dijkstra\n");
-
-    if(DEBUG)
-        printf("aresta: %d-%d, peso: %d\n", 0, G->A[0]->rotulo, G->A[0]->peso);
+        printf("Percorreu a pista \n");
 
     if(DEBUG)
         imprime(dist, pred, n);
 
-    int qntArestasPercorridas = qntdArestasPercorridas(pred, n);
-
-    if(DEBUG)
-        printf("quantidade de arestas percorridas: %d\n", qntArestasPercorridas);
-
-    // Para compensar as subtrações feitas nos pesos, soma-se o valor do maior peso em
-    // cada uma das arestas percorridas nesse caminho de maior velocidade
-    result = qntArestasPercorridas * maiorPeso + dist[n - 1] + vel_ini;
-
-    printf("%d\n", result);
+    printf("%d\n", dist[n-1] + vel_ini);
 
     return 0;
 }
